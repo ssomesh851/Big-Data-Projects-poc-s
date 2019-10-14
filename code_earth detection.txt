@@ -1,0 +1,44 @@
+//EXECUTE ON SPARK SHELL
+
+val earthquake=sc.textFile("/user/manjushriahuja6750/Edata.xls")
+val header =earthquake.first
+val data =earthquake.filter(row => !row.isEmpty && row!= header)
+
+//creating case class
+case class EarthquakeDetection(ClassificationIndex:Integer, PriWaveFirstActivityTime:Integer, PriWaveTimeTaken:Integer, PriWaveAcceleration:Integer, PriWaveBuildingStrength:Integer, 
+PriWaveVelocity:Integer, PriWaveSa:Integer, PriWaveSd:Integer, SecWaveFirstActivityTime:Integer, SecWaveTimeTaken:Integer, SecWaveAcceleration:Integer,SecWaveBuildingStrength:Integer, 
+SecWaveVelocity:Integer, SecWaveSa:Integer, SecWaveSd:Integer)
+
+//creating dataframe
+val earthquake_df=data.map(_.split(",",-1)).map(row =>EarthquakeDetection(row(0).trim.toInt, row(1).trim.toInt, row(2).trim.toInt, row(3).trim.toInt, row(4).trim.toInt, row(5).trim.toInt, row(6).trim.toInt, 
+row(7).trim.toInt, row(8).trim.toInt, row(9).trim.toInt, row(10).trim.toInt, row(11).trim.toInt, row(12).trim.toInt, if(!row.isEmpty) row(13).trim.toInt else 0, if(!row.isEmpty) row(14).trim.toInt else 0)).toDF()
+
+earthquake_df.show() //throws NumberFormatException
+
+val new_df = earthquake_df.na.replace("SecWaveSa",Map('""'->0)) //throws undisclosed literal error
+
+
+
+val earthquake=sc.textFile("/user/manjushriahuja6750/Edata.xls")
+val header =earthquake.first
+val data =earthquake.filter(row => !row.isEmpty && row!= header)
+
+case class EarthquakeDetection(ClassificationIndex:Integer, PriWaveFirstActivityTime:Integer, PriWaveTimeTaken:Integer, PriWaveAcceleration:Integer, PriWaveBuildingStrength:Integer, 
+PriWaveVelocity:Integer, PriWaveSa:Integer, PriWaveSd:Integer, SecWaveFirstActivityTime:Integer, SecWaveTimeTaken:Integer, SecWaveAcceleration:Integer, SecWaveBuildingStrength:Integer, SecwavaVelocity:Integer, SecWaveSa:Integer, SecWaveSd:Integer)
+
+val earthquake_ schema = data.map(row =>EarthquakeDetection(row(0).trim.toInt, row(1).trim.toInt, row(2).trim.toInt, row(3).trim.toInt, row(4).trim.toInt, row(5).trim.toInt, row(6).trim.toInt, row(7).trim.toInt, row(8).trim.toInt, row(9).trim.toInt, row(10).trim.toInt, row(11).trim.toInt, row(12).trim.toInt, row(13).trim.toInt, row(14).trim.toInt))
+
+val datafr = spark.createDataFrame(earthquake_schema)
+datafr.show()
+datafr.na.fill(0)
+
+NumberFormatException is an unchecked exception and it can occur when you are trying to convert a String to a numeric value, like an Integer or a Float, but the String is not well formatted for the conversion. 
+
+
+case class data(Indicator:Integer, Country:String, Date:String, value:Float)
+val data9 = eboladata1.map(row=>Eboladata(row(0).toString, row(1).toString, row(2).toString, row(3).toFloat))
+
+PROBLEM STATEMENTS OF EBOLA VIRUS DATASET
+
+1) find the values country wise?
+2)find the 
