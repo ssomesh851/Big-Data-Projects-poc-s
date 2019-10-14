@@ -1,0 +1,45 @@
+1)Write a mongodb query to display only event, group, response fields?
+2)Write the Mongodb query to skip the first 5 documents and display after 5 documents?
+3) Find out the count of the events where the group_city is Hyderabad ?
+ db.meetup6.aggregate([{$group : { _id : "$group.group_country"}}]).pretty()
+
+4)Write a query to display the count of the meetup's where country's are USA and India?
+5)Write a mongodb query to display the cities where the topic name is literature, reading?
+6)Write a mongodb query to display all the names of the countries which are involved in this meetup?
+7)Write a Mongodb query to display maximum latitude?
+> db.meetup6.aggregate([{$group : {_id : "$group.group_lat", max_lat : {$max : 1}}}])
+
+8)Write the mongodb query to display the data where the topic name is Big Data?
+db.meetup6.aggregate([{$match : {"group.group_topics.topic_name" : "Big Data"}}])
+
+9) Write a Mongodb query to find out the count of the events where the topic name is other then the Big Data?
+db.meetup6.find(
+{"group.group_topics.topic_name" : 
+{ $ne : "Big Data"
+}
+},
+{
+"visibility" : 1,
+"response" :1
+}
+).count()
+
+10) Find the event,response for those meetup's which contains Big Data as their topic name?
+
+db.meetup6.find(
+{"group.group_topics.topic_name": /.*Big Data.*/},
+{
+"event" : 1,
+"response":1,"group.group_name":1
+}
+);
+
+11) Write a Mongodb query to display the documents where the topic name is either Big Data or Data Science?
+db.meetup6.find(
+{ 
+"group.group_topics.topic_name": "Big Data" , 
+$or : [
+{ "group.group_topics.topic_name" : "Data Science" },
+] 
+} 
+);
