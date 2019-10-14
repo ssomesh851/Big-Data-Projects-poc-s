@@ -1,0 +1,207 @@
+Spark and Hive
+
+
+https://www.google.com/url?q=http://stream.meetup.com/2/rsvps&sa=D&source=hangouts&ust=1560601983396000&usg=AFQjCNGmOYt8hxEaRgJGDBiC-6Cy3k-LMg
+
+
+http://stream.meetup.com/2/rsvps
+
+
+// Data Flow
+
+Python - Flume - Kafka - Spark - MongoDB
+
+
+// Create a python script with following code and save it
+
+vi streamdata.py
+
+import json
+import requests
+r = requests.get('http://stream.meetup.com/2/rsvps', stream=True)
+for line in r.iter_lines():
+    if line:
+        print(line)
+
+				
+// Open a terminal > paste the below flume code > save it with .conf extension > run the below command
+
+tier1.sources  = source1
+tier1.channels = channel1
+tier1.sinks = sink1
+
+tier1.sources.source1.type = exec
+tier1.sources.source1.command = python meet.py
+tier1.sources.source1.channels = channel1
+
+tier1.channels.channel1.type = memory
+tier1.channels.channel1.capacity = 10000
+tier1.channels.channel1.transactionCapacity = 100
+
+tier1.sinks.sink1.type = org.apache.flume.sink.kafka.KafkaSink
+tier1.sinks.sink1.topic = meetup34
+tier1.sinks.sink1.brokerList = cxln1.c.thelab-240901.internal:6667
+tier1.sinks.sink1.channel = channel1
+tier1.sinks.sink1.batchSize = 20
+
+// Run below flume command
+
+flume-ng agent -n tier1 -f meetup-flume1.conf
+
+flume-ng agent --conf conf --conf-file flume.conf --name tier1 -Dflume.root.logger=INFO,console
+
+// Open second terminal > create a topic > run kafka consumer of the created topic
+
+export PATH=$PATH:/usr/hdp/current/kafka-broker/bin
+
+kafka-topics.sh --create --zookeeper localhost:2181 --replication-factor 1 --partitions 1 --topic meetup34
+
+kafka-console-consumer.sh --zookeeper localhost:2181 --topic meetup17 --from-beginning
+
+
+// command to enter into spark shell 
+
+export SPARK_MAJOR_VERSION=2
+
+spark-shell --jars spark-streaming-kafka-assembly_2.11-2.3.0.jar 
+
+spark-shell --master local[2] --conf "spark.dynamicAllocation.enabled=false" --jars /home/support1161/spark-streaming-kafka-0-8-assembly_2.11-2.3.0.jar 
+
+// After entering into the shell, execute the below code: 
+
+import org.apache.spark._
+import org.apache.spark.SparkConf
+import org.apache.spark.SparkContext
+import org.apache.spark.streaming.StreamingContext
+import org.apache.spark.streaming.Seconds
+import java.io.File
+import org.apache.spark.sql.{Row, SaveMode, SparkSession}
+import org.apache.spark.streaming.kafka._
+import org.apache.spark.streaming.kafka.KafkaUtils
+import org.apache.spark.storage.StorageLevel._
+import org.apache.log4j.Level  
+import org.apache.log4j.Logger
+import org.json4s._
+import kafka.producer.{KeyedMessage, Producer}
+import kafka.serializer.StringDecoder
+import scala.util.parsing.json._
+import spark.implicits._
+import spark.sql
+
+Logger.getLogger("org").setLevel(Level.OFF)  
+Logger.getLogger("akka").setLevel(Level.OFF)   
+
+
+	
+
+val warehouseLocation = new File("spark-warehouse").getAbsolutePath
+val spark = SparkSession.builder().appName("Spark Hive Example").config("spark.sql.warehouse.dir", warehouseLocation).enableHiveSupport().getOrCreate()
+
+   
+
+val ssc = new StreamingContext(sc, Seconds(5))
+val sqlContext = new org.apache.spark.sql.SQLContext(sc)
+
+
+case class meetdata(event:String, group:String, guests:String, member:String, response:String, rsvp_id:String, venue:String, visibility:String)
+case class meetdata(json:String)
+
+
+val topicMap = topics.split(",").toSet  
+
+val kafkaParams = Map[String, String]("metadata.broker.list" -> "cxln1.c.thelab-240901.internal:6667")   
+
+val stream = KafkaUtils.createDirectStream[String,String,StringDecoder,StringDecoder](ssc, kafkaParams, topicMap).map(_._2)
+val data = stream.map(line => line.split(","))
+
+data.foreachRDD{rdd => 
+import spark.implicits._ 
+val meet_data = rdd.map(row => meetdata(row(0).toString, row(1).toString, row(2).toString, row(3).toString, row(4).toString, row(5).toString, row(6).toString, row(7).toString)).toDF()
+meet_data.write.format("json").mode(SaveMode.Append).save("hdfs:///user/support1161/")
+}
+val meet_data = rdd.map(row => meetdata(row(0).toString(), row(1).toString, row(2).toString, row(3).toString, row(4).toString, row(5).toString, row(6).toString, row(7).toString)).toDF()
+val meet_data = rdd.map(row => meetdata(row(0).toString())).toDF()
+
+ssc.start()
+val data25 = 
+stream.foreachRDD(
+  rdd => {
+     val dataFrame = sqlContext.read.json(rdd.map(_._2))
+     dataFrame.createOrReplaceTempView("data")
+     
+        })
+
+ssc.start()
+
+
+
+CREATE TABLE business_events ( event_type string, event_date string
+
+)
+
+ROW FORMAT SERDE 'org.apache.hive.hcatalog.data.JsonSerDe'
+
+
+
+import requests
+r = requests.get('http://stream.meetup.com/2/rsvps', stream=True)
+for line in r.iter_lines():
+    if line:
+        print(line)
+
+possible column names are: event, group, guests, member, response, rsvp_id, venue, visibility
+
+
+hadoop fs -ls /user/hive/warehouse/somesh.db/meetup_data
+
+
+ADD JAR hdfs://apps/hive/warehouse/json-serde-1.1.9.9-Hive13-jar-with-dependencies.jar;
+
+ADD JAR /home/support1161/json-serde-1.3-jar-with-dependencies.jar;
+
+org.openx.data.jsonserde.JsonSerDe
+
+
+
+
+hive> insert overwrite table meet_up2 select get_json_object(meet_up.jsn, '$.event')as a, get_json_object(meet_up.jsn, '$.group52')as b, get_json_object(meet_up.jsn, '$.guests')as c, get_json_object(meet_up.jsn, '$.mem
+ber')as d, get_json_object(meet_up.jsn, '$.response')as e, get_json_object(meet_up.jsn, '$.rsvp_id')as f, get_json_object(meet_up.jsn, '$.venue')as g, get_json_object(meet_up.jsn, '$.visibility')as h from meet_up2;
+
+
+insert overwrite table meet_up4 select get_json_object(meet_up3.json, '$.event'), get_json_object(meet_up3.json, '$.group6'), get_json_object(meet_up3.json, '$.guests'), get_json_object(meet_up3.json, '$.member'), get_json_object(meet_up3.json, '$.response'), get_json_object(meet_up3.json, '$.rsvp_id'), get_json_object(meet_up3.json, '$.venue'), get_json_object(meet_up3.json, '$.visibility') from meet_up3;
+
+create external table jsontab1(event string, group52 string, guests int, member string, response string, rsvp_id string, venue string, visibility string) 
+LOCATION '/user/support1161/';
+insert overwrite table jsontab1 select get_json_object(col1, '$.event'), get_json_object(col1, '$.group52'), get_json_object(col1, '$.guests'), get_json_object(col1, '$.member'), get_json_object(col1, '$.response'), get_json_object(col1, '$.rsvp_id'), get_json_object(col1, '$.venue'), get_json_object(col1, '$.visibility') from jsontab;
+	
+ add jar /user/support1161/someshfiles/hive-json-serde-0.2.jar;
+
+add jar /user/support1161/hive-json-serde-0.2.jar;
+
+
+SELECT COUNT(*)
+  FROM INFORMATION_SCHEMA.COLUMNS
+ WHERE table_catalog = 'default'
+   AND table_name = 'meetup8_data'
+
+
+
+
+
+
+
+
+
+
+create table mylog( user int, page string, unix string) ROW FORMAT SERDE 'org.apache.hadoop.hive.serde2.columnar.ColumnarSerde' stored as JSONFILE;
+
+
+
+
+
+
+
+
+
+
+
