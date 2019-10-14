@@ -1,0 +1,103 @@
+Case study on Kafka & Spark integration
+
+// Kafka
+
+export PATH=$PATH:/usr/hdp/current/kafka-broker/bin/ 
+
+kafka-topics.sh --create --zookeeper localhost:2181 --replication-factor 1 --partitions 1 --topic DJE 
+
+kafka-console-producer.sh --broker-list ip-172-31-13-154.ec2.internal:6667 --topic DJE < /home/support1161/Divyansh/creditcard.csv
+
+--------------------------------------------------------------------------------------------------------------------------------------------------
+
+// Spark
+
+spark-shell --master local[2] --conf "spark.dynamicAllocation.enabled=false" --jars /home/support1161/spark-streaming-kafka-assembly_2.10-1.6.0.jar
+
+import org.apache.spark._
+import org.apache.spark.SparkConf
+import org.apache.spark.streaming.StreamingContext
+import org.apache.spark.streaming.Seconds
+import org.apache.spark.streaming.kafka.KafkaUtils
+import org.apache.spark.streaming.{Seconds, StreamingContext}
+import org.apache.spark.streaming.StreamingContext._
+import org.apache.spark.sql.SQLContext
+
+val ssc = new StreamingContext(sc,Seconds(10))
+
+sc.setLogLevel("ERROR")
+val kvs = KafkaUtils.createStream(ssc,"localhost:2181", "spark-streaming-consumer", Map("DJE"-> 1))
+
+val lines = kvs.map(_._2)
+val data = lines.map(line => line.split(",")) 
+
+case class creditData(Merchant_id:String, Average_Amount_transaction_day:String, Transaction_amount:String, Is_declined:String, Total_Number_of_declines_day:String, isForeignTransaction:String, isHighRiskCountry:String, Daily_chargeback_avg_amt:String, six_month_avg_chbk_amt:String, six_month_chbk_freq:String, isFradulent:String)
+
+--------------------------------------
+1) //Problem Statement 1 -- Identify all the transaction which are categorised as Fraud in the dataset.
+
+data.foreachRDD({ rdd =>
+  import sqlContext.implicits._
+  val credit_s = rdd.map(row => creditData(row(0), row(1), row(2), row(3), row(4), row(5), row(6), row(7), row(8), row(9), row(10))).toDF()
+  credit_s.registerTempTable("credit_code")
+  
+  val query1 = sqlContext.sql("select distinct(Merchant_id) from credit_code where isFradulent = 'Y'")
+  query1.show(5)
+  })
+ ssc.start()
+
+--------------------------------------
+2) //Problem Statement 2 -- Identify all those transaction whcih are approved for each distinc merchant on daily basis.
+
+data.foreachRDD({ rdd =>
+  import sqlContext.implicits._
+  val credit_s = rdd.map(row => creditData(row(0), row(1), row(2), row(3), row(4), row(5), row(6), row(7), row(8), row(9), row(10))).toDF()
+  credit_s.registerTempTable("credit_code")
+
+  val query2 = sqlContext.sql("select distinct(Merchant_id) from credit_code where Is_declined = 'Y'")
+  query2.show(5)
+  })
+ ssc.start()
+
+-------------------------------------
+3)//Problem Statement 3 -- Identify the sum of transaction for each merchant from the datset.
+
+data.foreachRDD({ rdd =>
+  import sqlContext.implicits._
+  val credit_s = rdd.map(row => creditData(row(0), row(1), row(2), row(3), row(4), row(5), row(6), row(7), row(8), row(9), row(10))).toDF()
+  credit_s.registerTempTable("credit_code")
+
+  val query3 = sqlContext.sql("select Merchant_id, sum(Transaction_amount) from credit_code group by Merchant_id")
+  query3.show(5)
+  })
+ ssc.start()
+
+----------------------------------
+4) //Problem Statement 4 -- Identify the sum of their last six month avergae checkbook amount whose are considered as Fraud for each merchant.
+
+data.foreachRDD({ rdd =>
+  import sqlContext.implicits._
+  val credit_s = rdd.map(row => creditData(row(0), row(1), row(2), row(3), row(4), row(5), row(6), row(7), row(8), row(9), row(10))).toDF()
+  credit_s.registerTempTable("credit_code")
+
+  val query4 = sqlContext.sql("select Merchant_id, sum(six_month_avg_chbk_amt),isFradulent from credit_code where isFradulent='Y' group by Merchant_id,isFradulent")
+  query4.show(5)
+  })
+ ssc.start()
+
+---------------------------------
+5) //Problem Statement 5 -- Identify sum of average amount transactions for each distinct merchant whose transactions are declined  
+
+data.foreachRDD({ rdd =>
+  import sqlContext.implicits._
+  val credit_s = rdd.map(row => creditData(row(0), row(1), row(2), row(3), row(4), row(5), row(6), row(7), row(8), row(9), row(10))).toDF()
+  credit_s.registerTempTable("credit_code")
+
+  val query5 = sqlContext.sql("Select distinct(Merchant_id), SUM(Average_Amount_transaction_day) from credit_code where Is_declined = 'Y' group by Merchant_id, Is_declined")
+  query5.show(5)
+  })
+ ssc.start()
+
+--------------------------------
+
+
