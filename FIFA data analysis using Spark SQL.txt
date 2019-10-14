@@ -1,0 +1,41 @@
+1)FInd out which teams have the highest potential?
+val data1 = spark.sql("select nationality,max(potential) from data group by nationality,potential order by potential desc")
+
+2)Find out the youngest teams / oldest teams
+players get better with age and experience and that their valuations would refelect this relationship
+
+
+3) what are the most expensive positions?
+val data5 = spark.sql("select position from fifa_data where value in(select max(value) from fifa_data group by value order by value desc) group by position")
+
+
+
+5) Find out the teams with the highest player valuations
+val data6 = spark.sql("select nationality,max(value) from fifa_data group by nationality, value order by value desc")
+
+
+6)Find out the great attacking teams. Also determine the teams with the highest attacking rating
+val data7 = spark.sql("select nationality from fifa_data where work_rate = 'High/ High' ")
+
+
+7)Most preferred foot of the players?
+val data8 = spark.sql("select count(preferred_foot) count, preferred_foot from fifa_data where preferred_foot in(select max(preferred_foot) from fifa_data1) group by preferred_foot")
+
+8)Count the number of players based on their skill moves?
+
+val data9 = spark.sql("select count(name) count of the player,skill_moves from fifa_data3 group by name, skill_moves")
+
+9)Best players per each position with their age, club, and nationality based on their Potential Scores?
+
+val data10 = spark.sql("select name,age,club,nationality,position from fifa_data where potential in(select potential from fifa_data3 group by name,age,position,club,potential order by potential desc)")
+10) Which country has the most players?
+
+val data11 = spark.sql("select nationality,count(*) as count from data group by nationality order by count desc limit 1")
+
+11)finding the popular clubs around the globe?
+
+val data5 = spark.sql("select count(*) count, club from fifadata group by club order by count desc")
+
+
+	
+
