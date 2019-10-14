@@ -1,0 +1,21 @@
+#Create the table
+create table restate (street string, cityname string, zipcode int, state string, beds int, baths int, sq_feet int, flat_type string, price int) row format delimited fields terminated by ',' stored as textfile;
+
+#Load the Input Dataset:
+load data local inpath 'real_state.csv' into table restate;
+
+#Display the content of table
+select * from restate;
+
+set hive.enforce.bucketing=true ;
+#It will set the number of reduce tasks to be equal to the number of buckets 
+
+
+
+create table bucket_table (street string, zipcode int, state string, beds int, baths int, sq_feet int, flat_type string, price int) partitioned by (city string) clustered by (street) into 4 buckets row format delimited fields terminated by  ',';
+
+insert into table bucket_table partition(city) select street, zipcode ,state, beds, baths, sq_feet,flat_type,price,cityname from restate;
+
+#Browse the directory 
+hdfs dfs -cat /user/hive/warehouse/landprop.db/bucket_table/city=ANTELOPE/000000_0
+

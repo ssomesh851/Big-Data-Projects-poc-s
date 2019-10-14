@@ -1,0 +1,41 @@
+create table user1 (first_name string, last_name string,  id string) 
+partitioned by (country string, region string)  
+row format delimited fields terminated by ',' stored as textfile;
+
+describe formatted user1;
+
+#Static Partitioning
+load data local inpath 'user_info1.txt' into table user1 partition (country = 'New Zealand',region = 'Quebec');
+
+hdfs dfs -ls /user/hive/warehouse/landprop.db/
+
+load data local inpath 'user_info2.txt' into table user1 partition (country = 'Nigeria',region = 'Pomorskie');
+
+load data local inpath 'user_info2.txt' into table user1 partition (country = 'Nigeria',region = 'Pomorskie');
+select * from user1 where country = 'Nigeria' and region = 'Pomorskie';
+
+#You can check partitions by browsing the HDFS directory:
+$hdfs dfs -ls /user/hive/warehouse/landprop.db/user1/
+
+#Dynamic Partitioning
+
+create table user2 (first_name string, last_name string,id string) partitioned by (country string, region string)  row format delimited fields terminated by  ',' stored as textfile;
+
+create table user3 (first_name string, last_name string,id string, country string, region string)  row format delimited fields terminated by ',' stored as textfile;
+
+load data local inpath 'user_info3.txt' into table user3;
+
+select * from user3;
+
+set hive.exec.dynamic.partition=true;
+set hive.exec.dynamic.partition.mode=nonstrict;
+set hive.exec.max.dynamic.partitions=100;
+set hive.exec.max.dynamic.partitions.pernode=100;
+
+#Inserting data into table user2 dynamically
+
+insert into table user2 partition(country,region) select first_name,last_name, id, country, region from user3;
+
+#You can check partitions by browsing the file:- 
+$hdfs dfs -ls /user/hive/warehouse/landprop.db/user2
+
