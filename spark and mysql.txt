@@ -1,0 +1,5 @@
+spark-shell --driver-class-path  mysql-connector-java-6.0.4.jar --jars  mysql-connector-java-6.0.4.jar
+
+val jdbcDF = spark.read.format("jdbc").option("url", "jdbc:mysql://cxln2.c.thelab-240901.internal/sqoopex").option("dbtable", "widgets").option("user", "sqoopuser").option("password", "NHkkP876rp").load()
+
+jdbcDF.show()

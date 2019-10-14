@@ -1,0 +1,96 @@
+
+------------------------------MYSQL commands------------------------------
+
+create table pipeline(Row_ID int not null, Order_ID int not null, Order_Date date, Ship_Date date, Ship_Mode varchar(20) default 'new', Customer_ID varchar(20) default 'new', Customer_Name varchar(20) default 'new', Segment varchar(20) default 'new', City varchar(20) default 'new', State varchar(20) default 'new', Country varchar(20) default 'new', Postal_Code varchar(20) default 'new', Market varchar(20) default 'new', Region varchar(20) default 'new', Product_ID varchar(20) default 'new', Category varchar(20) default 'new', Sub_Category varchar(20) default 'new', Product_Name varchar(20) default 'new', Sales varchar(20) default 'new', Quantity varchar(20) default 'new', Discount varchar(20) default 'new', Profit varchar(20) default 'new');
+
+
+ LOAD DATA LOCAL INFILE "orders.csv" INTO TABLE pipeline COLUMNS TERMINATED BY ',' LINES TERMINATED BY '\n' (Row_ID, Order_ID, @var1, @var2, Ship_Mode, Customer_ID, Customer_Name, Segment, City, State, Country, Postal_Code, Market, Region, Product_ID, Category, Sub_Category, Product_Name, Sales, Quantity, Discount, Profit) SET Order_Date = STR_TO_DATE(@var1, '%m/%d/%Y'), Ship_Date = STR_TO_DATE(@var2, '%m/%d/%Y');
+
+
+-------------------------Reading from HDFS part file------------------------------------ 
+
+sqoop import --connect "jdbc:mysql://ip-172-31-20-247:3306/sqoopex" --table pipeline --username sqoopuser -P --target-dir /user/support1161/Divya -m 1
+
+
+import org.apache.spark.{SparkContext,SparkConf}
+import org.apache.spark.sql.hive.HiveContext
+import org.apache.spark.sql.SQLContext
+import org.apache.spark.sql.SaveMode
+
+val hiveContext:SQLContext = new HiveContext(sc)
+
+val df = spark.read.option("header", "true").option("inferSchema", "true").csv("/user/support1161/Divya/part-m-00000")
+
+df.show()
+
+df.createOrReplaceTempView("orders")
+
+hiveContext.sql("use default")
+
+hiveContext.sql("create table djjj as select * from orders")
+
+hiveContext.sql("select * from djjj").show(2)
+
+
+
+------------------Reading from HDfs partfile but converting it into parquet within sqoop command while storing in HDFS------------------------
+
+
+sqoop import --connect "jdbc:mysql://ip-172-31-20-247:3306/sqoopex" --table pipeline --username sqoopuser -P --target-dir /user/support1161/Divya --as-parquet-file -m 1
+
+
+import org.apache.spark.{SparkContext,SparkConf}
+import org.apache.spark.sql.hive.HiveContext
+import org.apache.spark.sql.SQLContext
+import org.apache.spark.sql.SaveMode
+
+
+val conf = new SparkConf().setMaster("local").setAppName("HiveContext")
+val sc = new SparkContext(conf);
+val hiveContext:SQLContext = new HiveContext(sc)
+hiveContext.setConf("hive.metastore.uris","thrift://ip-172-31-20-247.ec2.internal:9083")  // open ambari and find the ip, there for hive 
+
+hiveContext.tables("default").show
+
+
+
+hiveContext.sql("use default")
+
+val orders = hiveContext.read.parquet("/user/support1161/Divya4")  // Not to give parquete file name
+
+orders.write.format("orc").mode(SaveMode.Append).saveAsTable("dee")
+
+
+-------------Directly from mysql to SPARK to Hive--------------
+
+Please follow below steps before entering into Spark shell: 
+
+hadoop fs -copyToLocal /data/spark/mysql-connector-java-5.1.36-bin.jar
+
+spark-shell --driver-class-path mysql-connector-java-5.1.36-bin.jar --jars mysql-connector-java-5.1.36-bin.jar 
+
+
+spark-shell --driver-class-path /home/support1161/mysql-connector-java-5.1.36.jar --jars /home/support1161/mysql-connector-java-5.1.36.jar
+
+import org.apache.spark.{SparkContext,SparkConf}
+import org.apache.spark.sql.hive.HiveContext
+import org.apache.spark.sql.SQLContext
+import org.apache.spark.sql.SaveMode
+val conf = new SparkConf().setMaster("local").setAppName("HiveContext")
+val sc = new SparkContext(conf);
+val hiveContext:SQLContext = new HiveContext(sc)
+hiveContext.setConf("hive.metastore.uris","thrift://ip-172-31-20-247.ec2.internal:9083")
+
+val prop = new java.util.Properties
+
+prop.put("user","sqoopuser")
+prop.put("password","NHkkP876rp")
+prop.put("driverClass","com.mysql.jdbc.Driver")
+val uri = "jdbc:mysql://ip-172-31-20-247:3306/sqoopex"
+val table = "pipeline"
+
+val orders = hiveContext.read.jdbc(uri,table,prop)
+
+orders.createOrReplaceTempView("orders")
+
+hiveContext.sql("select * from orders").write.format("orc").mode(SaveMode.Append).saveAsTable("dd")
