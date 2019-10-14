@@ -1,0 +1,76 @@
+val sqlContext = new org.apache.spark.sql.SQLContext(sc)
+import sqlContext.implicits._
+
+val input = sqlContext.read.format("com.databricks.spark.csv").option("inferSchema", "true").option("header","true").option("delimiter",",").load("/user/somesh/Spark/Citi_Bike/*.csv")
+
+val bike_data = 	input.toDF("tripduration","starttime","stoptime","ss_id","ss_name","ss_lat","ss_long","es_id","es_name“,“	es_lat","es_long","bikeid","usertype","birth_yr","gender")
+
+
+bike_data.createOrReplaceTempView("bike")
+1)Which route Citi Bikers ride the most?
+sqlContext.sql("select ss_name,ss_id,es_name,es_id,count(1) as cnt from bike group by ss_name,ss_id,es_name,es_id order by cnt desc").take(1).foreach(println)
+2)Find the biggest trip and its duration?
+val calcDist = def calcDist(lat1: Double, lon1: Double,lat2: Double, lon2: Double): Int = {
+	val AVERAGE_RADIUS_OF_EARTH_KM = 6371
+        val latDistance = Math.toRadians(lat1 - lat2)
+        val lngDistance = Math.toRadians(lon1 - lon2)
+        val sinLat = Math.sin(latDistance / 2)
+        val sinLng = Math.sin(lngDistance / 2)
+        val a = sinLat * sinLat +
+        (Math.cos(Math.toRadians(lat1)) *
+            Math.cos(Math.toRadians(lat2)) *
+            sinLng * sinLng)
+        val c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a))
+        (AVERAGE_RADIUS_OF_EARTH_KM * c).toInt }
+sqlContext.udf.register("calcDist", calcDist _)
+
+sqlContext.sql("SELECT starttime,stoptime,es_lat,es_long,ss_lat,ss_long,ss_id,ss_name,es_id,es_name, tripduration,round((tripduration/3600),2) as tripduration, calcDist(es_lat,es_long,ss_lat,ss_long) AS dist FROM bike ORDER BY dist DESC,tripduration desc").take(10).foreach(println) 
+sqlContext.sql("SELECT date_format(starttime,'H'), COUNT(1) as cnt FROM bike GROUP BY date_format(starttime,'H') ORDER BY cnt DESC LIMIT 12").take(12).foreach(println)
+3) When do they ride?
+sqlContext.sql("SELECT date_format(starttime,'H'), COUNT(1) as cnt FROM bike GROUP BY date_format(starttime,'H') ORDER BY cnt DESC LIMIT 12").take(12).foreach(println)
+4 - How far do they go?
+sqlContext.sql("SELECT ss_id,ss_name,es_id,es_name, tripduration, calcDist(ss_lat,ss_long,es_lat,es_long)   AS dist FROM bike ORDER BY dist DESC LIMIT 1").take(1).foreach(println)
+5) Which stations are most popular?
+ sqlContext.sql("SELECT ID,Station_Name,sum(cnt) as Total from (SELECT  s.ss_id as ID,s.ss_name as Station_Name,count(1) as cnt from bike s group by s.ss_id,s.ss_name UNION ALL SELECT e.es_id as ID,e.es_name as Station_Name,count(1) as cnt from bike e group by e.es_id,e.es_name) group by ID,Station_Name order by Total desc").take(5).foreach(println)
+6) Which days of the week are most rides taken on?
+sqlContext.sql("SELECT date_format(starttime,'E') as Day,count(1) as cnt from bike group by date_format(starttime,'E') order by cnt desc").take(7).foreach(println)
+
+
+Predict Gender based on patterns in the trip
+mport org.apache.spark.{SparkConf, SparkContext}
+import org.apache.spark.rdd.RDD
+import org.apache.spark.sql.SQLContext
+import org.apache.spark.sql.functions._
+import org.apache.spark.mllib.linalg.Vectors
+import org.apache.spark.mllib.regression.LabeledPoint
+import org.apache.spark.mllib.classification.{LogisticRegressionModel, LogisticRegressionWithLBFGS}
+//Upload the file
+val bike = sqlContext.read.format("com.databricks.spark.csv").option("header", "true").option("inferSchema", "true").option("delimiter", ",").load("/user/shilpakulk031569/Spark/Citi_Bike/* - Citi Bike trip data.csv")
+// Create DataFrame
+val bikeDF = bike.toDF("trip_duration", "start_time", "stop_time", "start_station_id", "start_station_name", "start_station_latitude", "start_station_longitude", "end_station_id", "end_station_name", "end_station_latitude", "end_station_longitude", "bike_id", "user_type", "birth_year", "gender")
+//Convert to RDD
+val bikeRDD = bikeDF.rdd
+ val features = bikeRDD.map { bike =>    val gender = if (bike.getInt(14) == 1) 0.0 else if (bike.getInt(14) == 2) 1.0 else  2.0    val trip_duration = bike.getInt(0).toDouble    val start_time = bike.getTimestamp(1).getTime.toDouble    val stop_time = bike.getTimestamp(2).getTime.toDouble    val start_station_id = bike.getInt(3).toDouble    val start_station_latitude = bike.getDouble(5)    val start_station_longitude = bike.getDouble(6)    val end_station_id = bike.getInt(7).toDouble    val end_station_latitude = bike.getDouble(9)    val end_station_longitude = bike.getDouble(10)    val user_type = if (bike.getString(12) == "Customer") 1.0 else 2.0    Array(gender, trip_duration, start_time, stop_time, start_station_id, start_station_latitude, start_station_longitude, end_station_id, end_station_latitude, end_station_longitude, user_type) 
+val labeled = features.map { x => LabeledPoint(x(0), Vectors.dense(x(1), x(2), x(3), x(4), x(5), x(6), x(7), x(8), x(9), x(10)))}
+// Split data into training (60%) and test (40%).    
+val training = labeled.filter(_.label != 2).randomSplit(Array(0.40, 0.60))(1)    val test = 	labeled.filter(_.label != 2).randomSplit(Array(0.60, 0.40))(1)        
+val test_count = test.count
+training.cache    
+training.count
+// Run training algorithm to build the model    
+val model = new LogisticRegressionWithLBFGS().setNumClasses(2).run(training)        
+// Compute raw scores on the test set.    
+val predictionAndLabels = test.map { case LabeledPoint(label, features) =>      
+val prediction = model.predict(features)      
+(prediction, label)    }		
+println("Predictions:")	
+predictionAndLabels.take(10).foreach(println)        
+val wrong = predictionAndLabels.filter {    
+case (label, prediction) => label != prediction    }   
+ println(s"Test count : " + test_count)	    
+val wrong_count = wrong.count	
+println(s"Wrong Prediction Count: " + wrong_count)        
+val accuracy = (test_count - wrong_count.toDouble) / test_count    
+println(s"Accuracy model1: " + accuracy)
+
+
