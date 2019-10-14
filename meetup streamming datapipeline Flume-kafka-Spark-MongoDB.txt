@@ -1,0 +1,124 @@
+https://www.google.com/url?q=http://stream.meetup.com/2/rsvps&sa=D&source=hangouts&ust=1560601983396000&usg=AFQjCNGmOYt8hxEaRgJGDBiC-6Cy3k-LMg
+
+
+http://stream.meetup.com/2/rsvps
+
+
+// Data Flow
+
+Python - Flume - Kafka - Spark - MongoDB
+
+
+// Create a python script with following code and save it
+
+vi streamdata.py
+
+import json
+import requests
+r = requests.get('http://stream.meetup.com/2/rsvps', stream=True)
+for line in r.iter_lines():
+    if line:
+        print(line)
+
+				
+// Open a terminal > paste the below flume code > save it with .conf extension > run the below command
+
+tier1.sources  = source1
+tier1.channels = channel1
+tier1.sinks = sink1
+
+tier1.sources.source1.type = exec
+tier1.sources.source1.command = python meet.py
+tier1.sources.source1.channels = channel1
+
+tier1.channels.channel1.type = memory
+tier1.channels.channel1.capacity = 10000
+tier1.channels.channel1.transactionCapacity = 100
+
+tier1.sinks.sink1.type = org.apache.flume.sink.kafka.KafkaSink
+tier1.sinks.sink1.topic = meetup21
+tier1.sinks.sink1.brokerList = cxln1.c.thelab-240901.internal:6667
+tier1.sinks.sink1.channel = channel1
+tier1.sinks.sink1.batchSize = 20
+
+// Run below flume command
+
+flume-ng agent -n tier1 -f meetup-flume1.conf
+
+flume-ng agent --conf conf --conf-file flume.conf --name tier1 -Dflume.root.logger=INFO,console
+
+// Open second terminal > create a topic > run kafka consumer of the created topic
+
+export PATH=$PATH:/usr/hdp/current/kafka-broker/bin
+
+kafka-topics.sh --create --zookeeper localhost:2181 --replication-factor 1 --partitions 1 --topic meetup21
+
+kafka-console-consumer.sh --zookeeper localhost:2181 --topic meetup17 --from-beginning
+
+
+// command to enter into spark shell 
+
+export SPARK_MAJOR_VERSION=2
+
+spark-shell --jars spark-streaming-kafka-assembly_2.11-2.3.0.jar 
+
+
+
+spark-shell --master local[2] --conf "spark.dynamicAllocation.enabled=false" --jars /home/support1161/spark-streaming-kafka-0-8-assembly_2.11-2.3.0.jar  --conf "spark.mongodb.input.uri=mongodb://127.0.0.1/somesh.meetup11?readPreference=primaryPreferred" --conf "spark.mongodb.input.partitioner=MongoPaginateBySizePartitioner" --conf "spark.mongodb.output.uri=mongodb://127.0.0.1/somesh.meetup11" --packages org.mongodb.spark:mongo-spark-connector_2.11:2.3.0
+
+// After entering into the shell, execute the below code: 
+
+import org.apache.spark._
+import org.apache.spark.SparkConf
+import org.apache.spark.SparkContext
+import com.mongodb.spark.sql._ 
+import org.apache.spark.streaming.StreamingContext
+import org.apache.spark.streaming.Seconds
+import org.apache.spark.streaming.kafka._
+import org.apache.spark.streaming.kafka.KafkaUtils
+import org.apache.spark.storage.StorageLevel._
+import org.apache.log4j.Level  
+import org.apache.log4j.Logger
+import org.json4s._
+import kafka.producer.{KeyedMessage, Producer}
+import kafka.serializer.StringDecoder
+import scala.util.parsing.json._
+
+Logger.getLogger("org").setLevel(Level.OFF)  
+Logger.getLogger("akka").setLevel(Level.OFF)   
+   
+val (brokerlist,  topics) = ("cxln1.c.thelab-240901.internal:6667", "meetup21") 
+
+val ssc = new StreamingContext(sc, Seconds(5))
+
+val sqlContext = new org.apache.spark.sql.SQLContext(sc)
+
+val topicMap = topics.split(",").toSet  
+
+val kafkaParams = Map[String, String]("metadata.broker.list" -> "cxln1.c.thelab-240901.internal:6667")   
+
+val stream = KafkaUtils.createDirectStream[String,String,StringDecoder,StringDecoder](ssc, kafkaParams, topicMap)
+
+stream.foreachRDD(
+  rdd => {
+     val dataFrame = sqlContext.read.json(rdd.map(_._2))
+     dataFrame.write.mode("append").mongo()
+        })
+
+ssc.start()
+
+
+
+
+
+
+
+import requests
+r = requests.get('http://stream.meetup.com/2/rsvps', stream=True)
+for line in r.iter_lines():
+    if line:
+        print(line)
+
+
+
+
